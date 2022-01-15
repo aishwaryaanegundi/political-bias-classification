@@ -17,16 +17,17 @@ def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True)
 
 num_epochs = 5
-batch_size = 4
+batch_size = 2
 learning_rate = 5e-5
-path_to_train_data = './data/polly/polly_train1.csv'
-path_to_test_data = './data/polly/polly_test1.csv'
+path_to_train_data = './data/polly/polly_train.csv'
+path_to_test_data = './data/polly/polly_test.csv'
 path_to_save_model = './models/bertbasegermancased-two_extremesv3.pt'
 pretrained_model_name = "deepset/gelectra-large"
 
 raw_datasets = load_dataset('csv', data_files = path_to_train_data, cache_dir = None, split='train')
 print(raw_datasets)
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name, normalization=True)
+
 tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
 tokenized_datasets = tokenized_datasets.remove_columns(["Tweet"])
 tokenized_datasets = tokenized_datasets.remove_columns(["text"])
