@@ -4,7 +4,6 @@ from datasets import load_metric
 from transformers import AutoTokenizer
 from torch.utils.data import DataLoader
 from datasets import Dataset
-
 from transformers import AutoModelForSequenceClassification
 from transformers import AdamW
 from transformers import get_scheduler
@@ -12,17 +11,39 @@ from tqdm.auto import tqdm
 import pandas as pd
 
 torch.cuda.empty_cache()
+# torch.distributed.init_process_group('NCCL')
 
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True)
 
+#Todo: Make this importable
+def get_train_test_data():
+    data = pd.read_csv('data/polly/polly.csv')
+    del data['Unnamed: 0']
+    data_0 = data[data['Party']=='Die Linke']
+    data_1 = data[data['Party']=='AfD']
+    data_1 = data_1.sample(data_0.shape[0])
+    train= pd.DataFrame()
+    train = train.append(data_0.sample(frac=0.9))
+    test = pd.DataFrame()
+    test= test.append(data_0.drop(train.index))
+    train = train.append(data_1.sample(frac=0.9))
+    test= test.append(data_1.drop(train[train['Party']=='AfD'].index))
+    train = train.dropna()
+    test = test.dropna()
+    train.to_csv('data/polly/polly_train_bert_base16.csv')
+    test.to_csv('data/polly/polly_test_bert_base16.csv')
+    
+get_train_test_data()
 num_epochs = 5
-batch_size = 2
+batch_size = 8
 learning_rate = 5e-5
-path_to_train_data = './data/polly/polly_train.csv'
-path_to_test_data = './data/polly/polly_test.csv'
-path_to_save_model = './models/bertbasegermancased-two_extremesv3.pt'
-pretrained_model_name = "deepset/gelectra-large"
+path_to_train_data = 'data/polly/polly_train_bert_base16.csv'
+path_to_test_data = 'data/polly/polly_test_bert_base16.csv'
+path_to_save_model = 'models/bert-base-16.pt'
+# pretrained_model_name = "deepset/bert-base-german-cased"
+pretrained_model_name = "bert-base-german-cased"
+
 
 raw_datasets = load_dataset('csv', data_files = path_to_train_data, cache_dir = None, split='train')
 print(raw_datasets)
@@ -36,7 +57,7 @@ tokenized_datasets = tokenized_datasets.remove_columns(["Type"])
 tokenized_datasets = tokenized_datasets.remove_columns(["Party"])
 tokenized_datasets = tokenized_datasets.remove_columns(["Unnamed: 0"])
 tokenized_datasets.set_format("torch")
-small_train_dataset = tokenized_datasets.shuffle(seed=42).select(range(14732)) #72121
+small_train_dataset = tokenized_datasets.shuffle(seed=42).select(range(14725)) #72121
 print(small_train_dataset)
 
 def tokenize_function(examples):
@@ -103,3 +124,5 @@ for batch in test_dataloader:
 
 score = metric.compute()
 print(score)
+
+# Todo: make predict function importable
