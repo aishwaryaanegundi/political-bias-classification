@@ -6,7 +6,16 @@ import numpy as np
 from icu_tokenizer import Tokenizer
 from icu_tokenizer import Normalizer
 import sklearn
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+from xgboost import XGBClassifier
+from sklearn.svm import SVC  
+from sklearn.metrics import classification_report, confusion_matrix 
+import re
 
 cap_path = datapath("/netscratch/aishwarya/political-bias-classification/data/fasttext/cc.de.300.bin")
 path_to_train_data = 'data/polly/polly_train_fdp_linke_bert_base.csv'
@@ -76,29 +85,41 @@ for sentence in test_data['text'].tolist():
     X.append(sent_vectorizer(sentence, model)) 
      
 X_train = V
-print(X_train)
 X_test = X
 Y_train = train_data['labels'].tolist()
-print(Y_train)
 Y_test =  test_data['labels'].tolist()
 
- 
-     
-classifier = MLPClassifier(alpha = 0.7, max_iter=400) 
-classifier.fit(X_train, Y_train)
- 
-df_results = pd.DataFrame(data=np.zeros(shape=(1,3)), columns = ['classifier', 'train_score', 'test_score'] )
-train_score = classifier.score(X_train, Y_train)
-test_score = classifier.score(X_test, Y_test)
- 
-print(classifier.predict_proba(X_test))
-print(classifier.predict(X_test))
-prediction = classifier.predict(X_test)
-report = sklearn.metrics.classification_report(Y_test, prediction)
-print(report)
-df_results.loc[1,'classifier'] = "MLP"
-df_results.loc[1,'train_score'] = train_score
-df_results.loc[1,'test_score'] = test_score
-print(df_results)
+classifiers = [
+    LogisticRegression(solver="sag", random_state=1),
+    LinearSVC(random_state=1),
+    RandomForestClassifier(random_state=1),
+    XGBClassifier(random_state=1),
+    MLPClassifier(
+        solver="adam",
+        hidden_layer_sizes=(12, 12, 12),
+        activation="relu",
+        early_stopping=True,
+        max_iter=400
+    ),
+]
+# get names of the objects in list 
+names = [re.match(r"[^\(]+", name.__str__())[0] for name in classifiers]
+print(f"Classifiers to test: {names}")
+
+results = {}
+for name, clf in zip(names, classifiers):
+    print(f"Training classifier: {name}")
+    clf.fit(X_train, Y_train)
+    prediction = clf.predict(X_test)
+    report = sklearn.metrics.classification_report(Y_test, prediction)
+    results[name] = report
+    
+# Prediction results
+for k, v in results.items():
+    print(f"Results for {k}:")
+    print(f"{v}\n")
+    
+
+
 
 
