@@ -1,22 +1,20 @@
+from gensim.models import KeyedVectors
+import pandas as pd
 from gensim.test.utils import datapath
 import gensim
 import numpy as np
-import pandas as pd
 from icu_tokenizer import Tokenizer
 from icu_tokenizer import Normalizer
+import sklearn
 from sklearn.neural_network import MLPClassifier
 
+cap_path = datapath("/netscratch/aishwarya/political-bias-classification/data/fasttext/cc.de.300.bin")
 path_to_train_data = 'data/polly/polly_train_fdp_linke_bert_base.csv'
 path_to_test_data = 'data/polly/polly_test_fdp_linke_bert_base.csv'
 path_to_save_model = 'models/fasttext-mlp-fdp-linke.pt'
-
-cap_path = datapath("/netscratch/aishwarya/political-bias-classification/data/fasttext/cc.de.300.bin")
 model = gensim.models.fasttext.load_facebook_vectors(cap_path)
 normalizer = Normalizer(lang='de', norm_puncts=True)
 tokenizer = Tokenizer(lang='de')
-text = "Heute stehen sie leider Seit an Seit mit denen , die #KrimAnnexion verharmlosen. Motto: d Wirtschaft dienen, u zwar d deutschen. Liberal???"
-text = normalizer.normalize(text)
-print(tokenizer.tokenize(text))
 
 def get_train_test_data():
     data = pd.read_csv('data/polly/polly_by_party_fdp_linke.csv')
@@ -38,66 +36,53 @@ def get_train_test_data():
 def sent_vectorizer(sent, model):
     sent = normalizer.normalize(sent)
     sent = tokenizer.tokenize(sent)
-    sent_vec =np.array([])
+    sent_vec =[]
     numw = 0
     for w in sent:
         try:
             if numw == 0:
                 sent_vec = model[w]
             else:
-                sent_vec = np.append(sent_vec, model[w])
+                sent_vec = np.add(sent_vec, model[w])
             numw+=1
         except:
             pass
-    
-    return np.mean(sent_vec)
+    x = np.asarray(sent_vec) / numw
+    if (x.shape[0] !=300):
+        print(x.shape, sent)
+    return x
 
-def meanEmbeddingVectorizer(sentences, model):
-    return np.array([
-            np.mean([model[w] for w in sent])
-            for sent in sentences
-        ])
-
-def vectorize(sent, model):
-    sent = normalizer.normalize(sent)
-    sent = tokenizer.tokenize(sent)
-    sent_vec =[]
-    return np.mean([model[w] for w in sent]) 
-
-train_data = pd.read_csv(path_to_train_data)
-test_data = pd.read_csv(path_to_test_data)
 get_train_test_data()
-train_vectors = np.array([])
-for tweet in train_data['text'].tolist():
-     train_vectors = np.append(train_vectors, vectorize(tweet, model))   
-test_vectors = []
-for tweet in test_data['text'].tolist():
-    test_vectors.append(vectorize(tweet, model))  
+train_data = pd.read_csv(path_to_train_data)
+train_data['text'].replace('', np.nan, inplace=True)
+train_data['text'].replace(' ', np.nan, inplace=True)
+train_data['text'].replace('  ', np.nan, inplace=True)
+train_data['text'].replace('   ', np.nan, inplace=True)
+train_data = train_data.dropna() 
 
-# train_vectors = []
-# for tweet in train_data['text'].tolist():
-#     tweet = normalizer.normalize(tweet)
-#     tweet = tokenizer.tokenize(tweet)
-#     train_vectors.append(tweet)   
-# test_vectors = []
-# for tweet in test_data['text'].tolist():
-#     tweet = normalizer.normalize(tweet)
-#     tweet = tokenizer.tokenize(tweet)
-#     test_vectors.append(tweet) 
-    
-# X_train = meanEmbeddingVectorizer(train_vectors,model)
-# print("##########################")
-# print(X_train)
-# print("##########################")
-# X_test = meanEmbeddingVectorizer(test_vectors,model)
-# Y_train = train_data['labels'].tolist()
-# Y_test =  test_data['labels'].tolist()
+test_data = pd.read_csv(path_to_test_data)
+test_data['text'].replace('', np.nan, inplace=True)
+test_data['text'].replace(' ', np.nan, inplace=True)
+test_data['text'].replace('  ', np.nan, inplace=True)
+train_data['text'].replace('    ', np.nan, inplace=True)
+test_data = test_data.dropna()
 
-    
-X_train = train_vectors
-X_test = test_vectors
+V=[]
+for sentence in train_data['text'].tolist():
+    V.append(sent_vectorizer(sentence, model))   
+
+X=[]
+for sentence in test_data['text'].tolist():
+    X.append(sent_vectorizer(sentence, model)) 
+     
+X_train = V
+print(X_train)
+X_test = X
 Y_train = train_data['labels'].tolist()
+print(Y_train)
 Y_test =  test_data['labels'].tolist()
+
+ 
      
 classifier = MLPClassifier(alpha = 0.7, max_iter=400) 
 classifier.fit(X_train, Y_train)
@@ -107,4 +92,13 @@ train_score = classifier.score(X_train, Y_train)
 test_score = classifier.score(X_test, Y_test)
  
 print(classifier.predict_proba(X_test))
+print(classifier.predict(X_test))
+prediction = classifier.predict(X_test)
+report = sklearn.metrics.classification_report(Y_test, prediction)
+print(report)
+df_results.loc[1,'classifier'] = "MLP"
+df_results.loc[1,'train_score'] = train_score
+df_results.loc[1,'test_score'] = test_score
 print(df_results)
+
+
