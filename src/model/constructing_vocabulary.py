@@ -25,15 +25,18 @@ from matplotlib import font_manager
 from sklearn.feature_extraction.text import CountVectorizer
 from collections import OrderedDict
 from nltk.corpus import stopwords
+import ast
+import numpy as np
 
 
 torch.cuda.empty_cache()
 
 path_to_train_data = 'data/polly/polly_train_afd_green_bert_base.csv'
-path_to_store_vocabulary = 'data/polly/afd-green-train-vocabulary.csv'
-path_to_store_pmi_tfidf_vocabulary = 'data/polly/afd-green-train-pmi_tfidf.csv'
+# path_to_store_vocabulary = 'data/polly/afd-green-train-vocabulary.csv'
+path_to_store_pmi_tfidf_vocabulary = 'data/polly/'
+path_to_test_data = 'data/polly/polly_test_afd_green_bert_base_predicted.csv'
 # path_to_predicted_files = 'data/polly/other_parties_afd_greens_predicted.csv'
-
+path_to_store_results = 'results/error_analysis'
 path_to_saved_model = 'models/bert-base-afd_green.pt'
 pretrained_model_name = "bert-base-german-cased"
 german_stop_words = stopwords.words('german')
@@ -41,13 +44,10 @@ german_stop_words = stopwords.words('german')
 
 ## obtaining attentions
 def get_attentions(sequence):
-#     print('sequence: ', sequence)
     tokenized_sequence = tokenizer.tokenize(sequence)
     indexed_tokens = tokenizer.encode(tokenized_sequence, return_tensors='pt')
     outputs = model(indexed_tokens)
     attention_layers = outputs[3]
-#     print('attention shape: ',attention_layers)
-#     print('attention shape: ', outputs[3][0].shape)
     layerwise_attentions = []
     for layer in attention_layers:
         for batch_element in layer:
@@ -136,7 +136,7 @@ def get_top_n_features_given_list_of_tweet_texts(n, hashtags_left, hashtags_righ
             feature_score.append({'feature':features[i],'score': scores[i]})
         tfidf_df = pd.DataFrame(feature_score)
         tfidf_df = tfidf_df.sort_values(by=['score'], ascending=False)
-        top_n = tfidf_df.head(n)
+        top_n = tfidf_df.head(len(features))
         return top_n
     else:
         scores = np.multiply(counts[1]/right_length, idfs)
@@ -146,23 +146,25 @@ def get_top_n_features_given_list_of_tweet_texts(n, hashtags_left, hashtags_righ
             feature_score.append({'feature':features[i],'score': scores[i]})
         tfidf_df = pd.DataFrame(feature_score)
         tfidf_df = tfidf_df.sort_values(by=['score'], ascending=False)
-        top_n = tfidf_df.head(n)
+        top_n = tfidf_df.head(len(features))
         return top_n
     
-pmi_tf_vocabulary = pd.DataFrame()
+tfidf_vocabulary = pd.DataFrame()
 n=500
-# train_data = pd.read_csv(path_to_train_data)
-# top_tfidf_left = get_top_n_features_given_list_of_tweet_texts(n,
-#                             train_data[train_data['labels']==0]['text'].tolist(),
-#                              train_data[train_data['labels']==1]['text'].tolist())
-# top_tfidf_right = get_top_n_features_given_list_of_tweet_texts(n,
-#                             train_data[train_data['labels']==0]['text'].tolist(),
-#                              train_data[train_data['labels']==1]['text'].tolist(), left=False)
+train_data = pd.read_csv(path_to_train_data)
+top_tfidf_left = get_top_n_features_given_list_of_tweet_texts(n,
+                            train_data[train_data['labels']==0]['text'].tolist(),
+                             train_data[train_data['labels']==1]['text'].tolist())
+top_tfidf_right = get_top_n_features_given_list_of_tweet_texts(n,
+                            train_data[train_data['labels']==0]['text'].tolist(),
+                             train_data[train_data['labels']==1]['text'].tolist(), left=False)
 
-# pmi_tf_vocabulary['tf_idf_left_keys'] = top_tfidf_left['feature'].tolist()
-# pmi_tf_vocabulary['tf_idf_left_scores'] = top_tfidf_left['score'].tolist()
-# pmi_tf_vocabulary['tf_idf_right_keys'] = top_tfidf_right['feature'].tolist()
-# pmi_tf_vocabulary['tf_idf_right_scores'] = top_tfidf_right['score'].tolist()
+tfidf_vocabulary['tf_idf_left_keys'] = top_tfidf_left['feature'].tolist()
+tfidf_vocabulary['tf_idf_left_scores'] = top_tfidf_left['score'].tolist()
+tfidf_vocabulary['tf_idf_left_rank'] = tfidf_vocabulary['tf_idf_left_scores'].rank()
+tfidf_vocabulary['tf_idf_right_keys'] = top_tfidf_right['feature'].tolist()
+tfidf_vocabulary['tf_idf_right_scores'] = top_tfidf_right['score'].tolist()
+tfidf_vocabulary['tf_idf_right_rank'] = tfidf_vocabulary['tf_idf_right_scores'].rank()
 
 # Computing pmi scores
 def get_top_n_features_based_pmi(n, left_tweets, right_tweets, left=True):
@@ -211,28 +213,177 @@ def get_top_n_features_based_pmi(n, left_tweets, right_tweets, left=True):
     
     pmi_df = pd.DataFrame(pmi)
     pmi_df = pmi_df.sort_values(by=['score'], ascending=False)
-    top_n = pmi_df.head(n)
+    top_n = pmi_df.head(len(features))
     return top_n
 
-# train_data = pd.read_csv(path_to_train_data)
-# top_pmi_left = get_top_n_features_based_pmi(n,
-#                              train_data[train_data['labels']==0]['text'].tolist(),
-#                              train_data[train_data['labels']==1]['text'].tolist(),
-#                             left=True)
-# top_pmi_right = get_top_n_features_based_pmi(n,
-#                              train_data[train_data['labels']==0]['text'].tolist(),
-#                              train_data[train_data['labels']==1]['text'].tolist(), left=False)
+pmi_vocabulary = pd.DataFrame()
+train_data = pd.read_csv(path_to_train_data)
+top_pmi_left = get_top_n_features_based_pmi(n,
+                             train_data[train_data['labels']==0]['text'].tolist(),
+                             train_data[train_data['labels']==1]['text'].tolist(),
+                            left=True)
+top_pmi_right = get_top_n_features_based_pmi(n,
+                             train_data[train_data['labels']==0]['text'].tolist(),
+                             train_data[train_data['labels']==1]['text'].tolist(), left=False)
 
 
-# pmi_tf_vocabulary['pmi_left_keys'] = top_pmi_left['feature'].tolist()
-# pmi_tf_vocabulary['pmi_left_scores'] = top_pmi_left['score'].tolist()
-# pmi_tf_vocabulary['pmi_right_keys'] = top_pmi_right['feature'].tolist()
-# pmi_tf_vocabulary['pmi_right_scores'] = top_pmi_right['score'].tolist()
+pmi_vocabulary['pmi_left_keys'] = top_pmi_left['feature'].tolist()
+pmi_vocabulary['pmi_left_scores'] = top_pmi_left['score'].tolist()
+pmi_vocabulary['pmi_left_rank'] = pmi_vocabulary['pmi_left_scores'].rank()
+pmi_vocabulary['pmi_right_keys'] = top_pmi_right['feature'].tolist()
+pmi_vocabulary['pmi_right_scores'] = top_pmi_right['score'].tolist()
+pmi_vocabulary['pmi_right_rank'] = pmi_vocabulary['pmi_right_scores'].rank()
 
-# pmi_tf_vocabulary.to_csv(path_to_store_pmi_tfidf_vocabulary)
+
+
+tfidf_vocabulary.to_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-tfidf.csv')
+pmi_vocabulary.to_csv(path_to_store_pmi_tfidf_vocabulary + 'afd-green-train-pmi.csv')
+                      
+# Constructing the vocabulary important token based on frequency of top two tokens in each tweet of train data
+# attention_data = pd.read_csv(path_to_store_vocabulary)
+def preprocess_attention_scores(row):
+    scores = row['average_across_layers']   
+    new_scores = []
+    scores = scores.split()
+    for s in scores:
+        s = s.rstrip()
+        s = s.removesuffix(']')
+        s = s.removeprefix('[') 
+        new_scores.append(s)
+    return new_scores
+
+# attention_data['attention_scores'] = attention_data.apply(preprocess_attention_scores, axis=1)
+# attention_data.to_csv(path_to_store_pmi_tfidf_vocabulary + 'afd-green-train-attention.csv')
+
+def get_top_two_tokens(row):
+    scores = row['attention_scores']
+    tokens=row['tokens']
+    try:
+        if isinstance(scores,str):
+            scores = ast.literal_eval(scores)
+        if isinstance(tokens,str):
+            tokens = ast.literal_eval(tokens)
+        tokens = np.asarray(tokens)
+        scores = np.asarray(scores)
+        ind = np.argpartition(scores, -2)[-2:]
+        return list(tokens[ind])
+    except Exception as e:
+        print(repr(e))
+        return None
+        
+attention_vocabulary = pd.read_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-attention.csv')
+attention_vocabulary['top_two_tokens'] = attention_vocabulary.apply(get_top_two_tokens, axis=1)
+attention_vocabulary.to_csv(path_to_store_pmi_tfidf_vocabulary + 'afd-green-train-attention.csv')
+
+attention_vocabulary = attention_vocabulary.dropna()
+left = attention_vocabulary[attention_vocabulary['labels']==0]
+all_important_attention_tokens = []
+for i,r in left.iterrows():
+    tokens = r['top_two_tokens']
+    if isinstance(tokens,str):
+        tokens = ast.literal_eval(tokens)
+    all_important_attention_tokens = all_important_attention_tokens + tokens
+token_frequencies = Counter(all_important_attention_tokens)
+token_frequencies = pd.DataFrame.from_dict(token_frequencies, orient='index').reset_index()
+token_frequencies = token_frequencies.rename(columns={'index':'token', 0:'frequency'})
+token_frequencies['rank'] = token_frequencies['frequency'].rank()
+token_frequencies.to_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-attention-frequencies-left.csv')
+right = attention_vocabulary[attention_vocabulary['labels']==1]
+all_important_attention_tokens = []
+for i,r in right.iterrows():
+    tokens = r['top_two_tokens']
+    if isinstance(tokens,str):
+        tokens = ast.literal_eval(tokens)
+    all_important_attention_tokens = all_important_attention_tokens + tokens
+token_frequencies = Counter(all_important_attention_tokens)
+token_frequencies = pd.DataFrame.from_dict(token_frequencies, orient='index').reset_index()
+token_frequencies = token_frequencies.rename(columns={'index':'token', 0:'frequency'})
+token_frequencies['rank'] = token_frequencies['frequency'].rank()
+token_frequencies.to_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-attention-frequencies-right.csv')
 
 # Error Analysis
-pmi_tf_vocabulary = pd.read_csv(path_to_store_pmi_tfidf_vocabulary)
-attention_data = pd.read_csv(path_to_store_vocabulary)
+tfidf_vocabulary = pd.read_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-tfidf.csv')
+pmi_vocabulary = pd.read_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-pmi.csv')
+attention_vocabulary = pd.read_csv(path_to_store_pmi_tfidf_vocabulary +'afd-green-train-attention-frequencies.csv')
 
+test_data = pd.read_csv(path_to_test_data)
 
+def get_diff_of_importance_score(row, right_keys, right_scores, left_keys, left_scores):
+    text = row['text']
+    text = text.split()
+    labels = row['labels']
+    diffs = []
+    for word in text:
+        word = word.lower()
+        print(word)
+        if word not in german_stop_words:
+            try:
+                r_sel = np.where(right_keys==word)
+                print('r_sel: ', r_sel)
+                r_score = right_scores[r_sel]
+                print('r_score: ', r_score)
+                l_sel = np.where(left_keys==word)
+                print('l_sel: ', l_sel)
+                l_score = left_scores[l_sel]
+                print('l_score: ', l_score)
+                if labels == 0:
+                    diff = r_score - l_score
+                else:
+                    diff = l_score - r_score
+            except Exception as e:
+                print(repr(e))
+                diff = 0
+        else:
+            diff = 0
+        if not diff:
+            diff = 0
+        if diff == 0:
+            diffs.append(diff)
+        else:
+            diffs.append(diff[0])
+        
+    return diffs
+
+wrong_predictions = test_data[test_data['labels'] != test_data['prediction']]
+wrong_predictions['tf_idf_diffs'] = wrong_predictions.apply(get_diff_of_importance_score,
+                                           right_keys = np.asarray(tfidf_vocabulary['tf_idf_right_keys'].tolist()),
+                                           right_scores = np.asarray(tfidf_vocabulary['tf_idf_right_scores'].tolist()),
+                                           left_keys = np.asarray(tfidf_vocabulary['tf_idf_left_keys'].tolist()),
+                                           left_scores = np.asarray(tfidf_vocabulary['tf_idf_left_scores'].tolist()),
+                                           axis=1)
+
+wrong_predictions['pmi_diffs'] = wrong_predictions.apply(get_diff_of_importance_score,
+                                           right_keys = np.asarray(pmi_vocabulary['pmi_right_keys'].tolist()),
+                                           right_scores = np.asarray(pmi_vocabulary['pmi_right_scores'].tolist()),
+                                           left_keys = np.asarray(pmi_vocabulary['pmi_left_keys'].tolist()),
+                                           left_scores = np.asarray(pmi_vocabulary['pmi_left_scores'].tolist()),
+                                           axis=1)
+wrong_predictions.to_csv(path_to_store_results+'afd_green.csv')
+
+# Correlation of attention with tfidf and pmi
+# Obtain the attention scores for test data
+# tokenizer = BertTokenizer.from_pretrained(pretrained_model_name)
+# config = BertConfig.from_pretrained(pretrained_model_name, output_hidden_states=True, output_attentions=True)
+# model = BertModel.from_pretrained(path_to_saved_model, config=config)
+# test_data = pd.read_csv(path_to_test_data)
+# test_data['text'] = test_data.apply(strip, axis=1)
+# test_data = test_data.replace('', np.nan, regex=True)
+# test_data = test_data.dropna()
+# tokens = []
+# layerwise_attentions = []
+# average_across_layers = []
+# for index, row in test_data.iterrows():
+#     text = row['text']
+#     tokenized_sequence, l_a, a_a_l = get_attentions(text)
+#     tokenized_sequence, l_a, a_a_l = combine_subword_scores(tokenized_sequence, l_a, a_a_l)
+#     tokens.append(tokenized_sequence)
+#     layerwise_attentions.append(l_a)
+#     average_across_layers.append(a_a_l)
+    
+# test_data['tokens'] = tokens
+# test_data['layerwise_attentions'] = layerwise_attentions
+# test_data['average_across_layers'] = average_across_layers
+# test_data.to_csv(path_to_store_results+'afd-green-test-data-attentions.csv')
+# test_data = pd.read_csv(path_to_store_results+'afd-green-test-data-attentions.csv')
+# test_data['attention_scores'] = test_data.apply(preprocess_attention_scores, axis=1)
+# test_data.to_csv(path_to_store_results+'afd-green-test-data-attentions.csv')
