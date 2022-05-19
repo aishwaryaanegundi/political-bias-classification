@@ -11,56 +11,40 @@ from tqdm.auto import tqdm
 import pandas as pd
 
 torch.cuda.empty_cache()
-afd_green = 'afd_green'
-fdp_linke = 'fdp_linke'
-dimension = afd_green
+# torch.distributed.init_process_group('NCCL')
 
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True)
 
 #Todo: Make this importable
 def get_train_test_data():
-    data = pd.read_csv('data/polly/polly_by_party_'+dimension+'.csv')
+    data = pd.read_csv('data/polly/polly_by_party.csv')
     del data['Unnamed: 0']
-    if dimension == afd_green:
-        data_0 = data[data['Party']=='Die Grünen']
-        data_1 = data[data['Party']=='AfD']
-        data_1 = data_1.sample(data_0.shape[0])
-        train= pd.DataFrame()
-        train = train.append(data_0.sample(frac=0.9))
-        test = pd.DataFrame()
-        test= test.append(data_0.drop(train.index))
-        train = train.append(data_1.sample(frac=0.9))
-        test= test.append(data_1.drop(train[train['Party']=='AfD'].index))
-        train = train.dropna()
-        test = test.dropna()
-        train.to_csv('data/polly/polly_train_'+dimension+'_bert_base.csv')
-        test.to_csv('data/polly/polly_test_'+dimension'_bert_base.csv')
-    else:
-        data_0 = data[data['Party']=='Die Linke']
-        data_1 = data[data['Party']=='FDP']
-        data_1 = data_1.sample(data_0.shape[0])
-        train= pd.DataFrame()
-        train = train.append(data_0.sample(frac=0.9))
-        test = pd.DataFrame()
-        test= test.append(data_0.drop(train.index))
-        train = train.append(data_1.sample(frac=0.9))
-        test= test.append(data_1.drop(train[train['Party']=='FDP'].index))
-        train = train.dropna()
-        test = test.dropna()
-        train.to_csv('data/polly/polly_train_'+dimension+'_bert_base.csv')
-        test.to_csv('data/polly/polly_test_'+dimension'_bert_base.csv')
+    data_0 = data[data['Party']=='Die Linke']
+    data_1 = data[data['Party']=='AfD']
+    data_1 = data_1.sample(data_0.shape[0])
+    train= pd.DataFrame()
+    train = train.append(data_0.sample(frac=0.9))
+    test = pd.DataFrame()
+    test= test.append(data_0.drop(train.index))
+    train = train.append(data_1.sample(frac=0.9))
+    test= test.append(data_1.drop(train[train['Party']=='AfD'].index))
+    train = train.dropna()
+    test = test.dropna()
+    train.to_csv('data/polly/polly_by_party_train_bert_base.csv')
+    test.to_csv('data/polly/polly_by_party_test_bert_base.csv')
     
-get_train_test_data()
+# get_train_test_data()
 num_epochs = 5
 batch_size = 8
 learning_rate = 5e-5
-path_to_train_data = 'data/polly/polly_train_'+dimension+'_bert_base.csv'
-path_to_test_data = 'data/polly/polly_test_'+dimension+'_bert_base.csv'
-path_to_save_model = 'models/bert-base-'+dimension+'.pt'
+path_to_train_data = 'data/polly/polly_train_type23_balanced.csv'
+path_to_test_data = 'data/polly/polly_by_party_test_bert_base.csv'
+path_to_save_model = 'models/bert-base-by-party-by-fans-balanced.pt'
+# pretrained_model_name = "deepset/bert-base-german-cased"
 pretrained_model_name = "bert-base-german-cased"
 
-train_lenth = pd.read_csv(path_to_train_data).shape[0]
+
 raw_datasets = load_dataset('csv', data_files = path_to_train_data, cache_dir = None, split='train')
 print(raw_datasets)
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name, normalization=True)
@@ -73,7 +57,7 @@ tokenized_datasets = tokenized_datasets.remove_columns(["Type"])
 tokenized_datasets = tokenized_datasets.remove_columns(["Party"])
 tokenized_datasets = tokenized_datasets.remove_columns(["Unnamed: 0"])
 tokenized_datasets.set_format("torch")
-small_train_dataset = tokenized_datasets.shuffle(seed=42).select(range(train_lenth)) #72121
+small_train_dataset = tokenized_datasets.shuffle(seed=42).select(range(9911)) #72121
 print(small_train_dataset)
 
 def tokenize_function(examples):

@@ -18,13 +18,15 @@ from transformers import get_scheduler
 from torch import nn
 
 torch.cuda.empty_cache()
+afd_green = 'afd_green'
+fdp_linke = 'fdp_linke'
+dimension = afd_green
 
-path_to_train_data = './data/polly/polly_train.csv'
-path_to_test_data = './data/polly/polly_test.csv'
-path_to_predicted_files = './data/polly/polly_text_predicted2_gelectra_v1.csv'
-path_to_saved_model = './models/gelectra-large-two_extremesv1.pt'
-pretrained_model_name = "deepset/gelectra-large"
-batch_size = 1
+path_to_test_data = 'data/polly/polly_test_'+dimension+'_bert_base.csv'
+path_to_predicted_files = 'data/polly/other_parties_'+dimension'_predicted.csv'
+path_to_saved_model = 'models/bert-base-'+dimension+'.pt'
+pretrained_model_name = "bert-base-german-cased"
+batch_size = 8
 
 tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name, normalization=True)
 
@@ -68,7 +70,7 @@ for batch in test_dataloader:
         outputs = model(**batch)
     logits = outputs.logits
     softmax_output = nn.functional.softmax(logits, dim=-1)
-    for s in softmax_output:
+    for s in softmax_output:retwee
         softmax_outputs.append(s[1].item())
     predictions = torch.argmax(logits, dim=-1)
     for p in predictions:
