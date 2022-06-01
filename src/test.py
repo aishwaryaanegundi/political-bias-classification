@@ -16,7 +16,6 @@ class ElgTestCase(unittest.TestCase):
         "25 Jahre #Mölln: Nach Hoyerswerda & Rostock ein weiterer schockierender Einschnitt in das ",
         "Lebensgefühl der Menschen mit Migrationshintergrund in Deutschland. Meine Eltern überlegten damals ernsthaft, ",
         "eine Strickleiter am Fenster zu installieren. #nievergessen"])
-    # TODO: check why the scores slightly differ in local and docker setup
     score_cultural: float = 0.014703391119837761
     score_socioeconomic: float = 0.0055877468548715115
 

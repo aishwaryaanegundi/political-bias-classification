@@ -15,7 +15,8 @@ RUN python -m venv venv
 RUN /elg/venv/bin/pip --no-cache-dir install torch==1.11.0
 COPY --from=GBERT /workspace /elg/models
 # Copy in our app, its requirements file and the entrypoint script
-COPY --chown=elg:elg models/ requirements.txt docker-entrypoint.sh elg_service.py /elg/
+COPY --chown=elg:elg models/ requirements.txt docker-entrypoint.sh /elg/
+COPY src/elg_service.py /elg/src
 RUN /elg/venv/bin/pip --no-cache-dir install -r requirements.txt
 COPY --chown=elg:elg . .
 RUN chmod +x ./docker-entrypoint.sh
