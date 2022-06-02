@@ -1,0 +1,14 @@
+version: '3.7'
+
+services:
+  bert_base_german_cased:
+    build: models
+    image: konstantinschulz/bert-base-german-cased:latest
+  pbgcs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    #    command: tail -f /dev/null
+    image: konstantinschulz/political-bias-german-cultural-socioeconomic:v1
+    # ports:
+    #   - "8000:8000"
